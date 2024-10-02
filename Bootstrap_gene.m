@@ -1,9 +1,9 @@
-function run_pls_bootstrap(expression_data, gene_names, T_static_data, bootnum)
+function run_pls_bootstrap(expression_data, gene_names, WMIDM, bootnum)
 % Function to perform PLS and bootstrap on given expression data and T-maps.
 % Inputs:
 %   expression_data - Predictor variables (matrix X)
 %   gene_names - List of gene names
-%   T_static_data - Structure containing T-map data with fields:
+%   WMIDM - Structure containing T-map data with fields:
 %                   'name', 'mean_r_feature_zscore', and 'folder'
 %   bootnum - Number of bootstrap iterations
 
@@ -15,9 +15,9 @@ function run_pls_bootstrap(expression_data, gene_names, T_static_data, bootnum)
     X(index_nan, :) = [];
 
     % Iterate over T-map data
-    for num = 1:length(T_static_data)
-        mean_r_feature_zscore = T_static_data(num).mean_r_feature_zscore;
-        output_path = fullfile(T_static_data(num).folder, T_static_data(num).name(1:end-4));
+    for num = 1:length(WMIDM)
+        mean_r_feature_zscore = WMIDM(num).mean_r_feature_zscore;
+        output_path = fullfile(WMIDM(num).folder, WMIDM(num).name(1:end-4));
         mkdir(output_path);
 
         if size(mean_r_feature_zscore, 1) == 1
