@@ -1,66 +1,76 @@
+# Load necessary libraries
+library(zlibbioc)           # BioConductor library for compressed data
+library(GO.db)              # Gene Ontology database
+library(HDO.db)             # Human Disease Ontology database
+library(org.Hs.eg.db)       # Human gene annotation package (OrgDb)
+library(clusterProfiler)    # Library for enrichment analysis
+library(tidyverse)          # Collection of packages for data manipulation and visualization
+library(ggplot2)            # Plotting library
+library(forcats)            # For factor manipulation
+library(dplyr)              # Data manipulation library
 
-library(zlibbioc)
-library(GO.db)
-library(HDO.db)
-library(org.Hs.eg.db)
-library(clusterProfiler)
-library(tidyverse)
-library(ggplot2)
-library(forcats)
-library(dplyr)
-
-
-# 读取CSV文件中的基因列表
-gene_files <- ("E:/HCP/WM-Getm-over/Results/Gene_expression/Regress/2bk_0bk_map_r_zscore_new_gene_PLS/PLS3_geneWeights.csv")
-
-
+# Read the gene list from the CSV file
+gene_files <- (".../PLS3_geneWeights.csv")
 data <- read.csv(gene_files)
 
-# 修改变量名
-names(data) <- c("gene", "fdr","zscore")
+# Rename the columns of the data for clarity
+names(data) <- c("gene", "fdr", "zscore")
 
-#### 差异基因提取
-#提取case组较control组表达的基因，提取zscore>0.2的数据
+#### Extract significant genes
+# Extract genes that are significantly downregulated (zscore < -2) and fdr < 0.05
 sig_gene <- data %>%
-  dplyr::filter(zscore < -2 & fdr<0.05)
+  dplyr::filter(zscore < -2 & fdr < 0.05)
 
-#### GO富集分析
-ids <- bitr(sig_gene$gene,'SYMBOL','ENTREZID','org.Hs.eg.db',drop = TRUE)
-write.csv(ids, file = 'PLS3_Gene_ENTREZID_Neg.csv',row.names = F)
+#### GO enrichment analysis
+# Convert gene symbols to Entrez IDs for GO analysis
+ids <- bitr(sig_gene$gene, 'SYMBOL', 'ENTREZID', 'org.Hs.eg.db', drop = TRUE)
+
+# Save the mapping of SYMBOL to ENTREZID to a CSV file
+write.csv(ids, file = 'PLS3_Gene_ENTREZID_Neg.csv', row.names = FALSE)
+
+# Print the first 5 rows of the mapping to check the output
 print(ids[1:5,])
-sig_gene <- merge(sig_gene,ids,by.x='gene',by.y='SYMBOL')
+
+# Merge the significant genes with their ENTREZID
+sig_gene <- merge(sig_gene, ids, by.x = 'gene', by.y = 'SYMBOL')
+
+# Sort the genes by z-score in descending order
 sig_gene <- arrange(sig_gene, desc(zscore))
+
+# Extract the ENTREZID column for GO analysis
 gene_diff <- sig_gene$ENTREZID
+
+# Perform GO enrichment analysis
 ego <- enrichGO(gene_diff,
                 OrgDb = "org.Hs.eg.db",
                 qvalueCutoff = 0.05,
                 pvalueCutoff = 0.05,
-                ont="all")
+                ont = "all")
 
-#### KEGG富集分析
+#### KEGG enrichment analysis
+# Perform KEGG enrichment analysis using ENTREZID
 KEGG <- enrichKEGG(gene_diff,
-                   organism = "hsa",
+                   organism = "hsa",  # 'hsa' is the organism code for Homo sapiens
                    qvalueCutoff = 0.05,
                    pvalueCutoff = 0.05)
 
-
-# 画出组合barplot富集图
-# Convert enrichResult objects to data frames
+# Convert enrichResult objects to data frames for further processing
 ego_df <- as.data.frame(ego)
 kegg_df <- as.data.frame(KEGG)
 
-# Add ONTOLOGY column to KEGG data frame
+# Add a new column 'ONTOLOGY' to the KEGG data to differentiate between GO and KEGG results
 kegg_df$subcategory <- NULL
 kegg_df$category <- NULL
 kegg_df$ONTOLOGY <- 'KEGG'
-# Combine the two data frames
+
+# Combine GO and KEGG results into one data frame
 combined_df <- rbind(ego_df, kegg_df)
 
-# Assuming combined_df is your data frame
+# Capitalize the first letter of each word in the 'Description' column
 combined_df <- combined_df %>%
   mutate(Description = str_to_title(Description))
 
-# Custom function to capitalize first letter of each word
+# Custom function to capitalize the first letter of each word
 capitalize <- function(s) {
   s <- tolower(s)
   s <- strsplit(s, " ")[[1]]
@@ -68,32 +78,36 @@ capitalize <- function(s) {
   return(paste(s, collapse = " "))
 }
 
-# Apply the function to the Description column
+# Apply the capitalization function to the 'Description' column
 combined_df$Description <- sapply(combined_df$Description, capitalize)
 
-
+# Update the GO enrichment result with the combined data frame
 ego@result <- combined_df
 
-write.csv(ego, file = 'PLS3_EnrichResult_Neg.csv',row.names = F)
+# Save the combined enrichment result to a CSV file
+write.csv(ego, file = 'PLS3_EnrichResult_Neg.csv', row.names = FALSE)
+
+# Get the number of rows in the combined data frame
 nums <- nrow(combined_df)
+
+# Create a bar plot of the enrichment results, split by ONTOLOGY
 barplot(ego,
-        x = "Count",
-        color = "p.adjust",
-        showCategory=5,
-        split='ONTOLOGY',
-        label_format = Inf)+
-  facet_grid(ONTOLOGY~.,
-             space = 'free_y',#面板大小根据y轴自行调整
-             scale='free_y'#子图坐标轴根据y轴自行调整
-  )+
-  #scale_y_discrete(labels=function(x) str_wrap(x, width = 100))+
-  theme(text = element_text(size=24),
-        axis.text.x = element_text(size = 23),  # x-axis labels
-        axis.text.y = element_text(size = 23),  # y-axis labels
-        axis.title = element_text(size=28),
-        legend.text = element_text(size=20),
-        legend.title = element_text(size=20),
-        plot.title = element_text(size=36,hjust = 1))
+        x = "Count",          # X-axis represents the count of genes in each category
+        color = "p.adjust",   # Bar color based on the adjusted p-value
+        showCategory = 5,     # Show top 5 categories
+        split = 'ONTOLOGY',   # Split the plot by ONTOLOGY (GO vs KEGG)
+        label_format = Inf) + 
+  facet_grid(ONTOLOGY ~ .,   # Separate plots for each ONTOLOGY category
+             space = 'free_y', # Adjust panel size based on the y-axis
+             scale = 'free_y'  # Adjust y-axis scale independently for each plot
+  ) +
+  theme(text = element_text(size = 24),         # General text size
+        axis.text.x = element_text(size = 23),  # X-axis label size
+        axis.text.y = element_text(size = 23),  # Y-axis label size
+        axis.title = element_text(size = 28),   # Axis title size
+        legend.text = element_text(size = 20),  # Legend text size
+        legend.title = element_text(size = 20), # Legend title size
+        plot.title = element_text(size = 36, hjust = 1))  # Plot title size
 
-ggsave(filename = "Regress_PLS_zuhe_barplot_Neg.png",width = 10, height = 10,dpi=300)
-
+# Save the plot as a PNG file
+ggsave(filename = "Regress_PLS_zuhe_barplot_Neg.png", width = 10, height = 10, dpi = 300)
