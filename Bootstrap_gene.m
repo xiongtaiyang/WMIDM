@@ -3,7 +3,7 @@ function run_pls_bootstrap(expression_data, gene_names, WMIDM, bootnum)
 % Inputs:
 %   expression_data - Predictor variables (matrix X)
 %   gene_names - List of gene names
-%   WMIDM - Structure containing T-map data with fields:
+%   WMIDM - Structure containing average pearson coefficient based on shcaefer400 atlas(1*400 vector) with fields:
 %                   'name', 'mean_r_feature_zscore', and 'folder'
 %   bootnum - Number of bootstrap iterations
 
