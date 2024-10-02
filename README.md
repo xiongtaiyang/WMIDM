@@ -31,3 +31,8 @@ This script analyzes the relationship between gene expression and different cell
 trainLinearRegressionModel.m:
 
 This script trains a linear regression model using a provided dataset, applying machine learning techniques to predict an outcome (response) based on a set of input features (predictors). It includes steps for training, validation, and testing of the model.
+
+KEGGGO_Enrichment_CellType.R
+
+This is a script for performing KEGG and GO gene enrichment analysis across different cell types. These categories include microglia (Micro), endothelial cells (Endo), oligodendrocyte precursor cells (OPC), oligodendrocytes (Oligo), astrocytes (Astro), excitatory neurons (Neuro-Ex), and inhibitory neurons (Neuro-In).
+
