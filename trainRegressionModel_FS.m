@@ -1,120 +1,88 @@
-function [trainedModel, validationRMSE, table_fill] = trainRegressionModel_FS(trainingData, responseData,KFolds)
-% [trainedModel, validationRMSE] = trainRegressionModel(trainingData,
-% responseData)
-% 返回经过训练的回归模型及其 RMSE。以下代码重新创建在回归学习器中训练的模型。您可以使用该生
-% 成的代码基于新数据自动训练同一模型，或通过它了解如何以程序化方式训练模型。
+function [trainedModel, validationRMSE, table_fill] = trainRegressionModel_FS(trainingData, responseData, KFolds)
+% Function to train a linear regression model with K-Fold cross-validation.
+% Inputs:
+%   trainingData - Matrix of predictor variables (features).
+%   responseData - Vector of response variable (target).
+%   KFolds - Number of folds for cross-validation.
 %
-%  输入:
-%      trainingData: 一个与导入 App 中的矩阵具有相同列数和数据类型的矩阵。
-%
-%      responseData: 一个与导入 App 中的向量具有相同数据类型的向量。responseData 的
-%       长度和 trainingData 的行数必须相等。
-%
-%
-%  输出:
-%      trainedModel: 一个包含训练的回归模型的结构体。该结构体中具有各种关于所训练模型的
-%       信息的字段。
-%
-%      trainedModel.predictFcn: 一个对新数据进行预测的函数。
-%
-%      validationRMSE: 表示验证 RMSE 的双精度值。在 App 中，"模型" 窗格显示每个模型
-%       的验证 RMSE。
-%
-% 使用该代码基于新数据来训练模型。要重新训练模型，请使用原始数据或新数据作为输入参数
-% trainingData 和 responseData 从命令行调用该函数。
-%
-% 例如，要重新训练基于原始数据集 T 和响应 Y 训练的回归模型，请输入:
-%   [trainedModel, validationRMSE] = trainRegressionModel(T, Y)
-%
-% 要使用返回的 "trainedModel" 对新数据 T2 进行预测，请使用
-%   yfit = trainedModel.predictFcn(T2)
-%
-% T2 必须是仅包含用于训练的预测变量列的矩阵。有关详细信息，请输入:
-%   trainedModel.HowToPredict
+% Outputs:
+%   trainedModel - A structure containing the trained regression model and information.
+%   validationRMSE - Validation Root Mean Squared Error (RMSE) from cross-validation.
+%   table_fill - A table containing the actual and predicted responses for validation data.
 
-% 由 MATLAB 于 2024-06-26 21:20:55 自动生成
+    % Extract predictors and response
+    % Convert input matrix to a table with named columns.
+    for i = 1:size(trainingData,2)
+        var_name{i} =  ['column_' num2str(i)];  % Create column names for the predictors
+        ispredictor(i) = false;  % Initialize categorical predictor flag (no categorical variables)
+    end
+    inputTable = array2table(trainingData, 'VariableNames', var_name);  % Create table for predictors
 
+    predictorNames = var_name;  % List of predictor variable names
+    predictors = inputTable(:, predictorNames);  % Extract predictor columns from table
+    response = responseData;  % Define the response variable
+    isCategoricalPredictor = ispredictor;  % Flag for categorical predictors (none in this case)
 
-% 提取预测变量和响应
-% 以下代码将数据处理为合适的形状以训练模型。
-%
-
-% 将输入转换为表
-for i = 1:size(trainingData,2)
-    var_name{i} =  ['column_' num2str(i)];
-    ispredictor(i) = false;
-end
-inputTable = array2table(trainingData, 'VariableNames', var_name);
-
-predictorNames = var_name;
-predictors = inputTable(:, predictorNames);
-response = responseData;
-isCategoricalPredictor = ispredictor;
-
-% 训练回归模型
-% 以下代码指定所有模型选项并训练模型。
-concatenatedPredictorsAndResponse = predictors;
-concatenatedPredictorsAndResponse.dp = response;
-linearModel = fitlm(...
-    concatenatedPredictorsAndResponse, ...
-    'linear', ...
-    'RobustOpts', 'off');
-
-% 使用 predict 函数创建结果结构体
-predictorExtractionFcn = @(x) array2table(x, 'VariableNames', predictorNames);
-linearModelPredictFcn = @(x) predict(linearModel, x);
-trainedModel.predictFcn = @(x) linearModelPredictFcn(predictorExtractionFcn(x));
-
-% 向结果结构体中添加字段
-trainedModel.LinearModel = linearModel;
-trainedModel.About = '此结构体是从回归学习器 R2023b 导出的训练模型。';
-trainedModel.HowToPredict = sprintf('要对新预测变量列矩阵 X 进行预测，请使用: \n yfit = c.predictFcn(X) \n将 ''c'' 替换为作为此结构体的变量的名称，例如 ''trainedModel''。\n \nX 必须包含正好 30 个列，因为此模型是使用 30 个预测变量进行训练的。\nX 必须仅包含与训练数据具有完全相同的顺序和格式的\n预测变量列。不要包含响应列或未导入 App 的任何列。\n \n有关详细信息，请参阅 <a href="matlab:helpview(fullfile(docroot, ''stats'', ''stats.map''), ''appregression_exportmodeltoworkspace'')">How to predict using an exported model</a>。');
-
-% 提取预测变量和响应
-% 以下代码将数据处理为合适的形状以训练模型。
-%
-% 将输入转换为表
-inputTable = array2table(trainingData, 'VariableNames', var_name);
-
-predictorNames = var_name;
-predictors = inputTable(:, predictorNames);
-response = responseData;
-isCategoricalPredictor = ispredictor;
-
-% 执行交叉验证
-
-cvp = cvpartition(size(response, 1), 'KFold', KFolds);
-% 将预测初始化为适当的大小
-validationPredictions = response;
-for fold = 1:KFolds
-    trainingPredictors = predictors(cvp.training(fold), :);
-    trainingResponse = response(cvp.training(fold), :);
-    foldIsCategoricalPredictor = isCategoricalPredictor;
-
-    % 训练回归模型
-    % 以下代码指定所有模型选项并训练模型。
-    concatenatedPredictorsAndResponse = trainingPredictors;
-    concatenatedPredictorsAndResponse.dp = trainingResponse;
+    % Train regression model
+    % Combine predictors and response for model fitting.
+    concatenatedPredictorsAndResponse = predictors;
+    concatenatedPredictorsAndResponse.dp = response;  % Add the response column to the table
     linearModel = fitlm(...
         concatenatedPredictorsAndResponse, ...
         'linear', ...
-        'RobustOpts', 'off');
+        'RobustOpts', 'off');  % Train linear model without robust options
 
-    % 使用 predict 函数创建结果结构体
-    linearModelPredictFcn = @(x) predict(linearModel, x);
-    validationPredictFcn = @(x) linearModelPredictFcn(x);
+    % Create function for predicting using the trained model
+    predictorExtractionFcn = @(x) array2table(x, 'VariableNames', predictorNames);
+    linearModelPredictFcn = @(x) predict(linearModel, x);  % Define prediction function
+    trainedModel.predictFcn = @(x) linearModelPredictFcn(predictorExtractionFcn(x));  % Store prediction function in the model structure
 
-    % 向结果结构体中添加字段
+    % Add model details to the result structure
+    trainedModel.LinearModel = linearModel;
+    trainedModel.About = 'This structure contains a trained regression model exported from the Regression Learner app.';
+    trainedModel.HowToPredict = sprintf(['To make predictions on new predictor data X, use: \n yfit = c.predictFcn(X) \n' ...
+        'where ''c'' is the name of the model structure (e.g., ''trainedModel'').\n \nX must contain exactly 30 columns '...
+        'because this model was trained with 30 predictors. X must only contain the predictor columns in the same order and format as the training data.']);
 
-    % 计算验证预测
-    validationPredictors = predictors(cvp.test(fold), :);
-    foldPredictions = validationPredictFcn(validationPredictors);
+    % Cross-validation
+    cvp = cvpartition(size(response, 1), 'KFold', KFolds);  % Create partition for K-Fold cross-validation
+    validationPredictions = response;  % Initialize validation predictions
 
-    % 按原始顺序存储预测
-    validationPredictions(cvp.test(fold), :) = foldPredictions;
+    % Perform K-Fold cross-validation
+    for fold = 1:KFolds
+        % Get training predictors and response for the current fold
+        trainingPredictors = predictors(cvp.training(fold), :);
+        trainingResponse = response(cvp.training(fold), :);
+        foldIsCategoricalPredictor = isCategoricalPredictor;
+
+        % Train the regression model on the current fold
+        concatenatedPredictorsAndResponse = trainingPredictors;
+        concatenatedPredictorsAndResponse.dp = trainingResponse;
+        linearModel = fitlm(...
+            concatenatedPredictorsAndResponse, ...
+            'linear', ...
+            'RobustOpts', 'off');  % Train linear model without robust options
+
+        % Define prediction function for the current fold
+        linearModelPredictFcn = @(x) predict(linearModel, x);
+        validationPredictFcn = @(x) linearModelPredictFcn(x);
+
+        % Predict on the validation set for the current fold
+        validationPredictors = predictors(cvp.test(fold), :);
+        foldPredictions = validationPredictFcn(validationPredictors);
+
+        % Store predictions in the original response order
+        validationPredictions(cvp.test(fold), :) = foldPredictions;
+    end
+
+    % Calculate Pearson correlation between actual and predicted responses
+    [r, p] = corr(response, validationPredictions, 'Type', 'Pearson');
+    
+    % Fill a table with actual and predicted responses for validation
+    table_fill = [response, validationPredictions];
+
+    % Calculate validation RMSE (Root Mean Squared Error)
+    isNotMissing = ~isnan(validationPredictions) & ~isnan(response);  % Check for missing values
+    validationRMSE = sqrt(nansum((validationPredictions - response).^2) / numel(response(isNotMissing)));  % Calculate RMSE
+
 end
-[r,p] = corr(response,validationPredictions,'Type','Pearson');
-table_fill = [response,validationPredictions];
-% 计算验证 RMSE
-isNotMissing = ~isnan(validationPredictions) & ~isnan(response);
-validationRMSE = sqrt(nansum(( validationPredictions - response ).^2) / numel(response(isNotMissing) ));
