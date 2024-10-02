@@ -36,3 +36,5 @@ KEGGGO_Enrichment_CellType.R
 
 This is a script for performing KEGG and GO gene enrichment analysis across different cell types. These categories include microglia (Micro), endothelial cells (Endo), oligodendrocyte precursor cells (OPC), oligodendrocytes (Oligo), astrocytes (Astro), excitatory neurons (Neuro-Ex), and inhibitory neurons (Neuro-In).
 
+KEGGGO_Enrichment.R
+This is a script for performing KEGG and GO gene enrichment analysis.
